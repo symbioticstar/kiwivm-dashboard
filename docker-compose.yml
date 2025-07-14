@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  kiwivm-dashboard:
+    # 使用阿里云镜像仓库的 latest 镜像
+    image: registry.cn-hangzhou.aliyuncs.com/kazune/kiwivm-dashboard:latest
+    container_name: kiwivm-dashboard
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"  # 仅绑定到本地回环地址，通过 nginx 反代访问
+    environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+    volumes:
+      # 可选：如果需要持久化日志或其他数据
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - kiwivm-network
+
+networks:
+  kiwivm-network:
+    driver: bridge
