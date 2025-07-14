@@ -87,6 +87,7 @@ interface ServerData {
 
 interface FetchState {
   loading: boolean;
+  refreshing: boolean;
   error: string | null;
 }
 
@@ -115,8 +116,16 @@ export default function Home() {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState(30);
 
-  const fetchData = useCallback(async (id: string, cred: Credential) => {
-    setFetchStates(prev => ({ ...prev, [id]: { loading: true, error: null } }));
+  const fetchData = useCallback(async (id: string, cred: Credential, isBackground = false) => {
+    setFetchStates(prev => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        loading: !isBackground,
+        refreshing: isBackground,
+        error: null,
+      },
+    }));
     try {
       const response = await fetch("/api/kiwivm", {
         method: "POST",
@@ -136,15 +145,15 @@ export default function Home() {
       const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
       console.error(`Failed to fetch data for ${cred.veid}:`, err);
       toast.error(`Error for VEID ${cred.veid}: ${errorMessage}`);
-      setFetchStates(prev => ({ ...prev, [id]: { loading: false, error: errorMessage } }));
+      setFetchStates(prev => ({ ...prev, [id]: { loading: false, refreshing: false, error: errorMessage } }));
     } finally {
-      setFetchStates(prev => ({ ...prev, [id]: { ...prev[id], loading: false } }));
+      setFetchStates(prev => ({ ...prev, [id]: { ...prev[id], loading: false, refreshing: false } }));
     }
   }, []);
 
-  const fetchDataForAll = useCallback(() => {
+  const fetchDataForAll = useCallback((isBackground = false) => {
     credentials.forEach((cred) => {
-      fetchData(cred.id, cred);
+      fetchData(cred.id, cred, isBackground);
     });
   }, [credentials, fetchData]);
 
@@ -174,7 +183,7 @@ export default function Home() {
     if (autoRefresh && credentials.length > 0) {
       const intervalId = setInterval(() => {
         toast.info("Auto-refreshing server data...");
-        fetchDataForAll();
+        fetchDataForAll(true);
       }, refreshInterval * 1000);
       return () => clearInterval(intervalId);
     }
@@ -345,10 +354,10 @@ export default function Home() {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {credentials.map((cred) => {
               const data = serverData[cred.id];
-              const state = fetchStates[cred.id] || { loading: true, error: null };
+              const state = fetchStates[cred.id] || { loading: true, refreshing: false, error: null };
               const actionState = actionStates[cred.id] || { loading: false, error: null };
 
-              if (state.loading) {
+              if (state.loading && !state.refreshing) {
                 return (
                   <Card key={cred.id}>
                     <CardHeader>
@@ -362,7 +371,7 @@ export default function Home() {
                 );
               }
 
-              if (state.error || !data) {
+              if (state.error && !data) {
                 return (
                   <Card key={cred.id} className="border-destructive">
                     <CardHeader>
@@ -381,6 +390,8 @@ export default function Home() {
                 );
               }
               
+              if (!data) return null;
+
               const statusColor = data.suspended ? "bg-red-500" : data.ve_status === "Running" ? "bg-green-500" : "bg-gray-500";
 
               return (
@@ -394,7 +405,10 @@ export default function Home() {
                         </CardTitle>
                         <CardDescription>{data.ip_addresses.join(", ")}</CardDescription>
                       </div>
-                       {actionState.loading && <Loader2 className="h-5 w-5 animate-spin" />}
+                      <div className="flex items-center gap-2">
+                        {state.refreshing && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+                        {actionState.loading && <Loader2 className="h-5 w-5 animate-spin" />}
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
