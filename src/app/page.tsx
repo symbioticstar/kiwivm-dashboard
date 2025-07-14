@@ -194,7 +194,7 @@ export default function Home() {
       if (storedCreds) {
         const parsedCreds = JSON.parse(storedCreds);
         setCredentials(parsedCreds);
-        if (parsedCreds.length > 0) {
+        if (parsedCreds.length > 0 && !selectedCredentialId) {
           setSelectedCredentialId(parsedCreds[0].id);
         }
       }
@@ -204,19 +204,18 @@ export default function Home() {
     }
   }, []);
 
+  // Fetch data when credentials change
   useEffect(() => {
     if (isClient) {
       localStorage.setItem("kiwivm-creds", JSON.stringify(credentials));
       if (credentials.length > 0) {
-        if (!selectedCredentialId && credentials.length > 0) {
-          setSelectedCredentialId(credentials[0].id);
-        }
         fetchDataForAll();
         credentials.forEach(cred => fetchUsageStats(cred.id, cred));
       }
     }
-  }, [credentials, isClient, fetchDataForAll, fetchUsageStats, selectedCredentialId]);
+  }, [credentials, isClient]);
 
+  // Handle auto-refresh
   useEffect(() => {
     if (autoRefresh && credentials.length > 0) {
       const intervalId = setInterval(() => {

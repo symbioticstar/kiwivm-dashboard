@@ -61,7 +61,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         {payload.map((pld: any, index: number) => (
           <div key={index} style={{ color: pld.color }}>
             {`${pld.name}: ${
-              pld.name.includes("CPU")
+              pld.name.includes("cpu")
                 ? `${pld.value.toFixed(2)}%`
                 : formatBytes(pld.value)
             }`}
@@ -95,7 +95,18 @@ export function MonitoringCharts({ stats, loading }: MonitoringChartsProps) {
     );
   }
 
-  const chartData = stats.data.map((d) => ({ ...d }));
+  const fortyEightHoursAgo = Math.floor(Date.now() / 1000) - 48 * 60 * 60;
+  const chartData = stats.data.filter(d => d.timestamp > fortyEightHoursAgo);
+
+  if (chartData.length === 0) {
+    return (
+      <div className="w-full h-full flex justify-center items-center">
+        <p className="text-muted-foreground">
+          No usage data available for the last 48 hours.
+        </p>
+      </div>
+    );
+  }
 
   const renderChart = (
     title: string,
