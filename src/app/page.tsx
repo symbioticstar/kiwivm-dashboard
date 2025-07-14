@@ -30,6 +30,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { ModeToggle } from "@/components/mode-toggle";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Trash2,
   PlusCircle,
@@ -43,6 +51,16 @@ import {
   HardDrive,
   MemoryStick,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Credential {
   id: string;
@@ -93,6 +111,9 @@ export default function Home() {
   const [actionStates, setActionStates] = useState<Record<string, ActionState>>({});
   const [isClient, setIsClient] = useState(false);
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
+  const [actionToConfirm, setActionToConfirm] = useState<{ id: string; action: "start" | "stop" | "restart" } | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [refreshInterval, setRefreshInterval] = useState(30);
 
   const fetchData = useCallback(async (id: string, cred: Credential) => {
     setFetchStates(prev => ({ ...prev, [id]: { loading: true, error: null } }));
@@ -148,6 +169,27 @@ export default function Home() {
       }
     }
   }, [credentials, isClient, fetchDataForAll]);
+
+  useEffect(() => {
+    if (autoRefresh && credentials.length > 0) {
+      const intervalId = setInterval(() => {
+        toast.info("Auto-refreshing server data...");
+        fetchDataForAll();
+      }, refreshInterval * 1000);
+      return () => clearInterval(intervalId);
+    }
+  }, [autoRefresh, refreshInterval, credentials, fetchDataForAll]);
+
+  const handleActionConfirm = () => {
+    if (actionToConfirm) {
+      handleAction(actionToConfirm.id, actionToConfirm.action);
+      setActionToConfirm(null);
+    }
+  };
+
+  const openConfirmationDialog = (id: string, action: "start" | "stop" | "restart") => {
+    setActionToConfirm({ id, action });
+  };
 
   const handleAction = async (id: string, action: "start" | "stop" | "restart") => {
     const cred = credentials.find(c => c.id === id);
@@ -239,7 +281,26 @@ export default function Home() {
           <Server className="w-8 h-8" />
           KiwiVM Dashboard
         </h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Switch id="auto-refresh" checked={autoRefresh} onCheckedChange={setAutoRefresh} />
+            <Label htmlFor="auto-refresh">Auto Refresh</Label>
+          </div>
+          <Select
+            value={String(refreshInterval)}
+            onValueChange={(value) => setRefreshInterval(Number(value))}
+            disabled={!autoRefresh}
+          >
+            <SelectTrigger className="w-[100px]">
+              <SelectValue placeholder="Interval" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="15">15s</SelectItem>
+              <SelectItem value="30">30s</SelectItem>
+              <SelectItem value="60">1m</SelectItem>
+              <SelectItem value="300">5m</SelectItem>
+            </SelectContent>
+          </Select>
           <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -367,19 +428,19 @@ export default function Home() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
                           disabled={data.ve_status === "Running" || actionState.loading}
-                          onClick={() => handleAction(cred.id, "start")}
+                          onClick={() => openConfirmationDialog(cred.id, "start")}
                         >
                           <Play className="mr-2 h-4 w-4" /> Start
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           disabled={data.ve_status === "Stopped" || actionState.loading}
-                          onClick={() => handleAction(cred.id, "stop")}
+                          onClick={() => openConfirmationDialog(cred.id, "stop")}
                         >
                           <StopCircle className="mr-2 h-4 w-4" /> Stop
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           disabled={data.ve_status === "Stopped" || actionState.loading}
-                          onClick={() => handleAction(cred.id, "restart")}
+                          onClick={() => openConfirmationDialog(cred.id, "restart")}
                         >
                           <RefreshCw className="mr-2 h-4 w-4" /> Restart
                         </DropdownMenuItem>
@@ -398,6 +459,23 @@ export default function Home() {
           </div>
         )}
       </main>
+
+      <AlertDialog open={!!actionToConfirm} onOpenChange={() => setActionToConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will {actionToConfirm?.action} the server. This action can take a few moments.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleActionConfirm}>
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
