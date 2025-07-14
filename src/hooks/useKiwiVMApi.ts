@@ -143,14 +143,25 @@ export function useKiwiVMApi() {
     }
   }, []);
 
+  // Initial load and credential changes
   useEffect(() => {
-    if (isClient && credentials.length > 0) {
-      credentials.forEach(cred => {
-        fetchData(cred.id, cred);
-        fetchUsageStats(cred.id, cred);
-      });
+    if (isClient) {
+      localStorage.setItem("kiwivm-creds", JSON.stringify(credentials));
+      if (credentials.length > 0) {
+        credentials.forEach(cred => fetchData(cred.id, cred));
+      }
     }
-  }, [isClient, credentials, fetchData, fetchUsageStats]);
+  }, [isClient, credentials, fetchData]);
+
+  // Fetch usage stats only for the selected server
+  useEffect(() => {
+    if (selectedCredentialId) {
+      const cred = credentials.find(c => c.id === selectedCredentialId);
+      if (cred) {
+        fetchUsageStats(cred.id, cred);
+      }
+    }
+  }, [selectedCredentialId, credentials, fetchUsageStats]);
 
   return {
     credentials,

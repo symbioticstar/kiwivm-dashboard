@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PlusCircle, Server } from "lucide-react";
+import { PlusCircle, Server, RefreshCw } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,8 +58,18 @@ export default function Home() {
 
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [actionToConfirm, setActionToConfirm] = useState<{ id: string; action: "start" | "stop" | "restart" } | null>(null);
-  const [autoRefresh, setAutoRefresh] = useState(false);
-  const [refreshInterval, setRefreshInterval] = useState(30);
+
+  const handleRefresh = () => {
+    toast.info("Refreshing data...");
+    if (credentials.length > 0) {
+      credentials.forEach(cred => {
+        fetchData(cred.id, cred, true);
+        if (cred.id === selectedCredentialId) {
+          fetchUsageStats(cred.id, cred);
+        }
+      });
+    }
+  };
 
   const handleAddCredentialSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -90,25 +100,9 @@ export default function Home() {
           KiwiVM Dashboard
         </h1>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Switch id="auto-refresh" checked={autoRefresh} onCheckedChange={setAutoRefresh} />
-            <Label htmlFor="auto-refresh">Auto Refresh</Label>
-          </div>
-          <Select
-            value={String(refreshInterval)}
-            onValueChange={(value) => setRefreshInterval(Number(value))}
-            disabled={!autoRefresh}
-          >
-            <SelectTrigger className="w-[100px]">
-              <SelectValue placeholder="Interval" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="15">15s</SelectItem>
-              <SelectItem value="30">30s</SelectItem>
-              <SelectItem value="60">1m</SelectItem>
-              <SelectItem value="300">5m</SelectItem>
-            </SelectContent>
-          </Select>
+          <Button onClick={handleRefresh} variant="outline">
+            <RefreshCw className="mr-2 h-4 w-4" /> Refresh
+          </Button>
           <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
             <DialogTrigger asChild>
               <Button>
