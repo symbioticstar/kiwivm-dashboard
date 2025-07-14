@@ -61,6 +61,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { MonitoringCharts, RawUsageStats } from "@/components/monitoring-charts";
 
 interface Credential {
   id: string;
@@ -113,6 +114,9 @@ export default function Home() {
   const [isClient, setIsClient] = useState(false);
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [actionToConfirm, setActionToConfirm] = useState<{ id: string; action: "start" | "stop" | "restart" } | null>(null);
+  const [selectedCredentialId, setSelectedCredentialId] = useState<string | null>(null);
+  const [rawUsageStats, setRawUsageStats] = useState<Record<string, RawUsageStats>>({});
+  const [isChartLoading, setChartLoading] = useState<Record<string, boolean>>({});
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState(30);
 
@@ -157,12 +161,42 @@ export default function Home() {
     });
   }, [credentials, fetchData]);
 
+  const fetchUsageStats = useCallback(async (id: string, cred: Credential) => {
+    setChartLoading(prev => ({ ...prev, [id]: true }));
+    try {
+      const response = await fetch("/api/kiwivm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          veid: cred.veid,
+          api_key: cred.api_key,
+          action: "getRawUsageStats",
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || data.error) {
+        throw new Error(data.error || "Failed to fetch usage stats");
+      }
+      setRawUsageStats(prev => ({ ...prev, [id]: data }));
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
+      console.error(`Failed to fetch usage stats for ${cred.veid}:`, err);
+      toast.error(`Usage stats error for VEID ${cred.veid}: ${errorMessage}`);
+    } finally {
+      setChartLoading(prev => ({ ...prev, [id]: false }));
+    }
+  }, []);
+
   useEffect(() => {
     setIsClient(true);
     try {
       const storedCreds = localStorage.getItem("kiwivm-creds");
       if (storedCreds) {
-        setCredentials(JSON.parse(storedCreds));
+        const parsedCreds = JSON.parse(storedCreds);
+        setCredentials(parsedCreds);
+        if (parsedCreds.length > 0) {
+          setSelectedCredentialId(parsedCreds[0].id);
+        }
       }
     } catch (error) {
       console.error("Failed to parse credentials from localStorage", error);
@@ -174,20 +208,30 @@ export default function Home() {
     if (isClient) {
       localStorage.setItem("kiwivm-creds", JSON.stringify(credentials));
       if (credentials.length > 0) {
+        if (!selectedCredentialId && credentials.length > 0) {
+          setSelectedCredentialId(credentials[0].id);
+        }
         fetchDataForAll();
+        credentials.forEach(cred => fetchUsageStats(cred.id, cred));
       }
     }
-  }, [credentials, isClient, fetchDataForAll]);
+  }, [credentials, isClient, fetchDataForAll, fetchUsageStats, selectedCredentialId]);
 
   useEffect(() => {
     if (autoRefresh && credentials.length > 0) {
       const intervalId = setInterval(() => {
         toast.info("Auto-refreshing server data...");
         fetchDataForAll(true);
+        if (selectedCredentialId) {
+          const cred = credentials.find(c => c.id === selectedCredentialId);
+          if (cred) {
+            fetchUsageStats(cred.id, cred);
+          }
+        }
       }, refreshInterval * 1000);
       return () => clearInterval(intervalId);
     }
-  }, [autoRefresh, refreshInterval, credentials, fetchDataForAll]);
+  }, [autoRefresh, refreshInterval, credentials, fetchDataForAll, fetchUsageStats, selectedCredentialId]);
 
   const handleActionConfirm = () => {
     if (actionToConfirm) {
@@ -351,125 +395,136 @@ export default function Home() {
             <p className="text-sm text-muted-foreground">Click &quot;Add New Account&quot; to get started.</p>
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {credentials.map((cred) => {
-              const data = serverData[cred.id];
-              const state = fetchStates[cred.id] || { loading: true, refreshing: false, error: null };
-              const actionState = actionStates[cred.id] || { loading: false, error: null };
+          <div className="flex gap-6">
+            <div className="w-1/3 space-y-4">
+              {credentials.map((cred) => {
+                const data = serverData[cred.id];
+                const state = fetchStates[cred.id] || { loading: true, refreshing: false, error: null };
+                const actionState = actionStates[cred.id] || { loading: false, error: null };
 
-              if (state.loading && !state.refreshing) {
+                if (state.loading && !state.refreshing) {
+                  return (
+                    <Card key={cred.id}>
+                      <CardHeader>
+                        <CardTitle>Loading...</CardTitle>
+                        <CardDescription>Fetching data for VEID: {cred.veid}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex justify-center items-center p-10">
+                        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                      </CardContent>
+                    </Card>
+                  );
+                }
+
+                if (state.error && !data) {
+                  return (
+                    <Card key={cred.id} className="border-destructive">
+                      <CardHeader>
+                        <CardTitle className="text-destructive">Error</CardTitle>
+                        <CardDescription>Could not fetch data for VEID: {cred.veid}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-destructive-foreground bg-destructive/20 p-3 rounded-md">{state.error}</p>
+                      </CardContent>
+                      <CardFooter className="flex justify-end">
+                          <Button variant="destructive" size="sm" onClick={() => handleRemoveCredential(cred.id)}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Remove
+                          </Button>
+                        </CardFooter>
+                    </Card>
+                  );
+                }
+                
+                if (!data) return null;
+
+                const statusColor = data.suspended ? "bg-red-500" : data.ve_status === "Running" ? "bg-green-500" : "bg-gray-500";
+                const isSelected = selectedCredentialId === cred.id;
+
                 return (
-                  <Card key={cred.id}>
+                  <Card key={cred.id} onClick={() => setSelectedCredentialId(cred.id)} className={`cursor-pointer ${isSelected ? 'border-primary' : ''}`}>
                     <CardHeader>
-                      <CardTitle>Loading...</CardTitle>
-                      <CardDescription>Fetching data for VEID: {cred.veid}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex justify-center items-center p-10">
-                      <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                    </CardContent>
-                  </Card>
-                );
-              }
-
-              if (state.error && !data) {
-                return (
-                  <Card key={cred.id} className="border-destructive">
-                    <CardHeader>
-                      <CardTitle className="text-destructive">Error</CardTitle>
-                      <CardDescription>Could not fetch data for VEID: {cred.veid}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-destructive-foreground bg-destructive/20 p-3 rounded-md">{state.error}</p>
-                    </CardContent>
-                     <CardFooter className="flex justify-end">
-                        <Button variant="destructive" size="sm" onClick={() => handleRemoveCredential(cred.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" /> Remove
-                        </Button>
-                      </CardFooter>
-                  </Card>
-                );
-              }
-              
-              if (!data) return null;
-
-              const statusColor = data.suspended ? "bg-red-500" : data.ve_status === "Running" ? "bg-green-500" : "bg-gray-500";
-
-              return (
-                <Card key={cred.id}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          <span className={`w-3 h-3 rounded-full ${statusColor}`}></span>
-                          {data.hostname}
-                        </CardTitle>
-                        <CardDescription>{data.ip_addresses.join(", ")}</CardDescription>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {state.refreshing && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
-                        {actionState.loading && <Loader2 className="h-5 w-5 animate-spin" />}
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                            <Server className="w-4 h-4"/>
-                            <span>{data.os}</span>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="flex items-center gap-2">
+                            <span className={`w-3 h-3 rounded-full ${statusColor}`}></span>
+                            {data.hostname}
+                          </CardTitle>
+                          <CardDescription>{data.ip_addresses.join(", ")}</CardDescription>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Globe className="w-4 h-4"/>
-                            <span>{data.node_location}</span>
+                          {state.refreshing && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+                          {actionState.loading && <Loader2 className="h-5 w-5 animate-spin" />}
                         </div>
-                    </div>
-                    <div className="space-y-3">
-                      {renderUsageBar(data.plan_ram - data.mem_available_kb * 1024, data.plan_ram, "RAM", <MemoryStick className="w-4 h-4" />)}
-                      {renderUsageBar(data.ve_used_disk_space_b, data.plan_disk, "Disk", <HardDrive className="w-4 h-4" />)}
-                      {renderUsageBar(data.data_counter * data.monthly_data_multiplier, data.plan_monthly_data * data.monthly_data_multiplier, "Bandwidth", <Globe className="w-4 h-4" />)}
-                    </div>
-                     <p className="text-xs text-muted-foreground text-center pt-2">
-                        Bandwidth resets on {new Date(data.data_next_reset * 1000).toLocaleDateString()}
-                     </p>
-                  </CardContent>
-                  <CardFooter className="flex justify-end">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" disabled={actionState.loading}>
-                          <MoreVertical className="h-4 w-4" />
-                          <span className="sr-only">Actions</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          disabled={data.ve_status === "Running" || actionState.loading}
-                          onClick={() => openConfirmationDialog(cred.id, "start")}
-                        >
-                          <Play className="mr-2 h-4 w-4" /> Start
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={data.ve_status === "Stopped" || actionState.loading}
-                          onClick={() => openConfirmationDialog(cred.id, "stop")}
-                        >
-                          <StopCircle className="mr-2 h-4 w-4" /> Stop
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={data.ve_status === "Stopped" || actionState.loading}
-                          onClick={() => openConfirmationDialog(cred.id, "restart")}
-                        >
-                          <RefreshCw className="mr-2 h-4 w-4" /> Restart
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-500"
-                          onClick={() => handleRemoveCredential(cred.id)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" /> Remove
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </CardFooter>
-                </Card>
-              );
-            })}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                              <Server className="w-4 h-4"/>
+                              <span>{data.os}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                              <Globe className="w-4 h-4"/>
+                              <span>{data.node_location}</span>
+                          </div>
+                      </div>
+                      <div className="space-y-3">
+                        {renderUsageBar(data.plan_ram - data.mem_available_kb * 1024, data.plan_ram, "RAM", <MemoryStick className="w-4 h-4" />)}
+                        {renderUsageBar(data.ve_used_disk_space_b, data.plan_disk, "Disk", <HardDrive className="w-4 h-4" />)}
+                        {renderUsageBar(data.data_counter * data.monthly_data_multiplier, data.plan_monthly_data * data.monthly_data_multiplier, "Bandwidth", <Globe className="w-4 h-4" />)}
+                      </div>
+                       <p className="text-xs text-muted-foreground text-center pt-2">
+                          Bandwidth resets on {new Date(data.data_next_reset * 1000).toLocaleDateString()}
+                       </p>
+                    </CardContent>
+                    <CardFooter className="flex justify-end">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" disabled={actionState.loading}>
+                            <MoreVertical className="h-4 w-4" />
+                            <span className="sr-only">Actions</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            disabled={data.ve_status === "Running" || actionState.loading}
+                            onClick={() => openConfirmationDialog(cred.id, "start")}
+                          >
+                            <Play className="mr-2 h-4 w-4" /> Start
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={data.ve_status === "Stopped" || actionState.loading}
+                            onClick={() => openConfirmationDialog(cred.id, "stop")}
+                          >
+                            <StopCircle className="mr-2 h-4 w-4" /> Stop
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={data.ve_status === "Stopped" || actionState.loading}
+                            onClick={() => openConfirmationDialog(cred.id, "restart")}
+                          >
+                            <RefreshCw className="mr-2 h-4 w-4" /> Restart
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-500"
+                            onClick={() => handleRemoveCredential(cred.id)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" /> Remove
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </CardFooter>
+                  </Card>
+                );
+              })}
+            </div>
+            <div className="w-2/3">
+              {selectedCredentialId && (
+                <MonitoringCharts
+                  stats={rawUsageStats[selectedCredentialId]}
+                  loading={isChartLoading[selectedCredentialId]}
+                />
+              )}
+            </div>
           </div>
         )}
       </main>
