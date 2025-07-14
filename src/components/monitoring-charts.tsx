@@ -9,7 +9,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  TooltipProps,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,10 +47,20 @@ const formatDate = (timestamp: number) => {
   return new Date(timestamp * 1000).toLocaleTimeString();
 };
 
-const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    color: string;
+    name: string;
+    value: number;
+  }>;
+  label?: number;
+}
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   const { theme } = useTheme();
   if (active && payload && payload.length) {
-    const formattedLabel = new Date(label * 1000).toLocaleString();
+    const formattedLabel = new Date((label || 0) * 1000).toLocaleString();
     return (
       <div
         className={`p-2 border rounded-md shadow-lg ${
@@ -61,7 +70,7 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>)
         }`}
       >
         <p className="label font-bold">{`${formattedLabel}`}</p>
-        {payload.map((pld, index) => (
+        {payload.map((pld, index: number) => (
           <div key={index} style={{ color: pld.color }}>
             {`${pld.name}: ${
               pld.name?.includes("cpu")

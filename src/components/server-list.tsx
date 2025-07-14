@@ -1,7 +1,7 @@
 "use client";
 
 import { ServerCard } from "./server-card";
-import type { Credential, ServerData, FetchState, ActionState } from "@/app/page";
+import type { Credential, ServerData, FetchState, ActionState } from "@/types";
 
 interface ServerListProps {
   credentials: Credential[];

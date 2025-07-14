@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
-import type { Credential, ServerData, FetchState, ActionState } from "./page";
+import type { Credential, ServerData, FetchState, ActionState } from "@/types";
 import type { RawUsageStats } from "@/components/monitoring-charts";
 
 export function useKiwiVMApi() {
@@ -133,7 +133,7 @@ export function useKiwiVMApi() {
       if (storedCreds) {
         const parsedCreds = JSON.parse(storedCreds);
         setCredentials(parsedCreds);
-        if (parsedCreds.length > 0 && !selectedCredentialId) {
+        if (parsedCreds.length > 0) {
           setSelectedCredentialId(parsedCreds[0].id);
         }
       }

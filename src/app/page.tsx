@@ -14,14 +14,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ModeToggle } from "@/components/mode-toggle";
-import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { PlusCircle, Server, RefreshCw } from "lucide-react";
 import {
   AlertDialog,
@@ -152,7 +144,7 @@ export default function Home() {
               actionStates={actionStates}
               selectedCredentialId={selectedCredentialId}
               onSelectCredential={setSelectedCredentialId}
-              onAction={setActionToConfirm}
+              onAction={(id, action) => setActionToConfirm({ id, action })}
               onRemove={removeCredential}
             />
             <div className="w-2/3">

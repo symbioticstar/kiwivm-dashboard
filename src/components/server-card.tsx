@@ -28,7 +28,7 @@ import {
   MemoryStick,
   Trash2,
 } from "lucide-react";
-import type { ServerData, FetchState, ActionState } from "@/app/page";
+import type { ServerData, FetchState, ActionState } from "@/types";
 
 interface ServerCardProps {
   credId: string;
@@ -75,7 +75,6 @@ const renderUsageBar = (
 };
 
 export function ServerCard({
-  credId,
   veid,
   data,
   state,
@@ -124,8 +123,8 @@ export function ServerCard({
 
   const statusColor =
     data.suspended ? "bg-red-500"
-    : data.ve_status === "Running" ? "bg-green-500"
-    : "bg-gray-500";
+      : data.ve_status === "Running" ? "bg-green-500"
+        : "bg-gray-500";
 
   return (
     <Card

@@ -1,0 +1,43 @@
+{
+  "categories": {
+    "correctness": "warn",
+    "suspicious": "warn",
+    "pedantic": "off",
+    "perf": "warn",
+    "restriction": "off",
+    "style": "off",
+    "nursery": "off"
+  },
+  "rules": {
+    "react/jsx-key": "error",
+    "react/jsx-no-duplicate-props": "error",
+    "react/jsx-no-undef": "error",
+    "react/no-children-prop": "error",
+    "react/no-danger-with-children": "error",
+    "react/no-deprecated": "warn",
+    "react/no-direct-mutation-state": "error",
+    "react/no-find-dom-node": "error",
+    "react/no-is-mounted": "error",
+    "react/no-render-return-value": "error",
+    "react/no-string-refs": "error",
+    "react/no-unescaped-entities": "warn",
+    "react/no-unknown-property": "error",
+    "react/no-unsafe": "warn",
+    "react/require-render-return": "error",
+    "typescript/no-unused-vars": "warn",
+    "typescript/no-explicit-any": "off"
+  },
+  "ignoreFiles": [
+    "node_modules/",
+    ".next/",
+    "dist/",
+    "build/",
+    "out/",
+    ".git/",
+    "*.min.js",
+    "*.min.css",
+    "next-env.d.ts",
+    "*.config.js",
+    "*.config.ts"
+  ]
+}
