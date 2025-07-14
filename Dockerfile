@@ -29,6 +29,7 @@ COPY . .
 
 # 设置环境变量
 ENV NEXT_TELEMETRY_DISABLED 1
+ENV DOCKER_BUILD true
 
 # 构建应用
 RUN pnpm build
