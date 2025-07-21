@@ -73,8 +73,8 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
         {payload.map((pld, index: number) => (
           <div key={index} style={{ color: pld.color }}>
             {`${pld.name}: ${
-              pld.name?.includes("cpu")
-                ? `${pld.value?.toFixed(2)}%`
+              pld.name?.includes("CPU")
+                ? `${pld.value}%`
                 : formatBytes(pld.value as number)
             }`}
           </div>
@@ -128,13 +128,14 @@ export function MonitoringCharts({ stats, loading }: MonitoringChartsProps) {
   }
 
   const timeAgo = Math.floor(Date.now() / 1000) - timeRange * 60 * 60;
-  const chartData = stats.data.filter(d => d.timestamp > timeAgo);
+  const chartData = stats.data.filter((d) => d.timestamp > timeAgo);
 
   if (chartData.length === 0) {
     return (
       <div className="w-full h-full flex justify-center items-center">
         <p className="text-muted-foreground">
-          No usage data available for the last {timeRange === 168 ? '7 days' : `${timeRange} hours`}.
+          No usage data available for the last{" "}
+          {timeRange === 168 ? "7 days" : `${timeRange} hours`}.
         </p>
       </div>
     );
@@ -145,7 +146,7 @@ export function MonitoringCharts({ stats, loading }: MonitoringChartsProps) {
     dataKey: string | [string, string],
     colors: string | [string, string],
     names: string | [string, string],
-    isFirstChart = false,
+    isFirstChart = false
   ) => (
     <Card>
       <CardHeader>
@@ -153,7 +154,7 @@ export function MonitoringCharts({ stats, loading }: MonitoringChartsProps) {
           <CardTitle className="text-lg">{title}</CardTitle>
           {isFirstChart && (
             <div className="flex justify-end gap-2">
-              {timeRanges.map(range => (
+              {timeRanges.map((range) => (
                 <Button
                   key={range.value}
                   variant={timeRange === range.value ? "default" : "outline"}
@@ -229,13 +230,13 @@ export function MonitoringCharts({ stats, loading }: MonitoringChartsProps) {
         "Network I/O",
         ["network_in_bytes", "network_out_bytes"],
         ["#82ca9d", "#ffc658"],
-        ["Network In", "Network Out"],
+        ["Network In", "Network Out"]
       )}
       {renderChart(
         "Disk I/O",
         ["disk_read_bytes", "disk_write_bytes"],
         ["#ff7300", "#387908"],
-        ["Disk Read", "Disk Write"],
+        ["Disk Read", "Disk Write"]
       )}
     </div>
   );
